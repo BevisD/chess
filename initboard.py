@@ -1,0 +1,21 @@
+from bitboard import *
+from GUI import *
+
+W_KING = 0b1000
+W_QUEEN = 0b10000
+W_BISHOPS = 0b100100
+W_KNIGHTS = 0b1000010
+W_ROOKS = 0b10000001
+W_PAWNS = 0xff00
+W_PIECES = W_KING | W_QUEEN | W_BISHOPS | W_KNIGHTS | W_ROOKS | W_PAWNS
+
+B_KING = v_flip(W_KING)
+B_QUEEN = v_flip(W_QUEEN)
+B_BISHOPS = v_flip(W_BISHOPS)
+B_KNIGHTS = v_flip(W_KNIGHTS)
+B_ROOKS = v_flip(W_ROOKS)
+B_PAWNS = v_flip(W_PAWNS)
+B_PIECES = B_KING | B_QUEEN | B_BISHOPS | B_KNIGHTS | B_ROOKS | B_PAWNS
+
+NOT_A_FILE = 0x7f7f7f7f7f7f7f7f
+NOT_H_FILE = 0xfefefefefefefefe
