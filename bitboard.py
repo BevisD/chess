@@ -68,7 +68,7 @@ debruijn64 = np.int64(0x03f79d71b4cb0a89)
 
 def bitScanForward(bb):
     assert bb != 0
-    return index64[(np.multiply(bb ^ (bb-1), debruijn64)) >> 58]
+    return index64[(np.multiply(bb ^ (bb-1), debruijn64, dtype=np.int64)) >> 58]
 
 
 def get_indices(bb):

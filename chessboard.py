@@ -1,6 +1,5 @@
 from bitboard import *
-from initboard import *
-from GUI import *
+from constants import *
 
 
 def single_push_targets(pawns: int, empty: int, colour: int):
@@ -29,9 +28,49 @@ class ChessBoard:
         self.rooks_list = [W_ROOKS, B_ROOKS]
         self.pawns_list = [W_PAWNS, B_PAWNS]
         self.pieces_list = [W_PIECES, B_PIECES]
-        self.pieces = self.pieces_list[0] | self.pieces_list[1]
+        self.pieces = self.pieces_list[WHITE] | self.pieces_list[BLACK]
         self.empty = ~self.pieces
         self.en_passant = 0
+
+        self.turn = WHITE
+        self.move_list = self.legal_moves(WHITE)
+
+    def make_move(self, move):
+        code, to_square, from_square = move
+        if code == 0 or code == 1:
+            mask = (0b1 << to_square) | (0b1 << from_square)
+            # TODO Treat code0 and code1 moves separately for en passant
+            # TODO Move making must be easily un-doable for min-max
+            if self.king_list[self.turn] & mask:
+                self.king_list[self.turn] ^= mask
+            elif self.queens_list[self.turn] & mask:
+                self.queens_list[self.turn] ^= mask
+            elif self.rooks_list[self.turn] & mask:
+                self.rooks_list[self.turn] ^= mask
+            elif self.bishops_list[self.turn] & mask:
+                self.bishops_list[self.turn] ^= mask
+            elif self.knights_list[self.turn] & mask:
+                self.knights_list[self.turn] ^= mask
+            elif self.pawns_list[self.turn] & mask:
+                self.pawns_list[self.turn] ^= mask
+
+        self.turn = not self.turn
+        self.update_pieces()
+        self.move_list = self.legal_moves(self.turn)
+        print(self.move_list)
+
+    def update_pieces(self):
+        # TODO This function needs to be undoable for min-max
+        for c in [WHITE, BLACK]:
+            self.pieces_list[c] = self.king_list[c] | \
+                                  self.queens_list[c] | \
+                                  self.rooks_list[c] | \
+                                  self.bishops_list[c] | \
+                                  self.knights_list[c] | \
+                                  self.pawns_list[c]
+
+        self.pieces = self.pieces_list[WHITE] | self.pieces_list[BLACK]
+        self.empty = ~self.pieces
 
     def legal_moves(self, colour: int):
         moves = []
@@ -63,7 +102,7 @@ class ChessBoard:
         moves = []
         moves += self.legal_single_push_moves(colour)
         moves += self.legal_double_push_moves(colour)
-        moves += self.legal_attack_moves(colour)
+        moves += self.legal_pawn_attack_moves(colour)
         return moves
 
     def legal_single_push_moves(self, colour: int):
@@ -91,15 +130,24 @@ class ChessBoard:
                                                   self.empty, colour)
         double_push_targets = single_push_targets(single_pawn_targets,
                                                   self.empty, colour)
+
+        if colour:
+            double_push_targets &= RANK_5
+        else:
+            double_push_targets &= RANK_4
+
         indices = get_indices(double_push_targets)
 
         for to_square in indices:
-            from_square = to_square - 16
+            if colour:
+                from_square = to_square + 16
+            else:
+                from_square = to_square - 16
 
-            moves.append((0, to_square, from_square))
+            moves.append((1, to_square, from_square))
         return moves
 
-    def legal_attack_moves(self, colour):
+    def legal_pawn_attack_moves(self, colour):
         moves = []
         west_attacks = pawn_west_attacks(self.pawns_list[colour],
                                          self.pieces_list[~colour], colour)
@@ -129,8 +177,8 @@ class ChessBoard:
 
         for move in west_moves + east_moves + \
                     west_en_passant_moves + east_en_passant_moves:
-            to_square = move[1]
-            from_square = move[2]
+            to_square = move[TO]
+            from_square = move[FROM]
             if to_square >= 56 or to_square <= 7:
                 for code in range(12, 16):
                     moves.append((code, to_square, from_square))
