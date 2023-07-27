@@ -27,7 +27,7 @@ def handle_click_event(index: int):
         remove_highlights()
         return
     else:
-        if clicked & chessboard.pieces_list[chessboard.turn]:
+        if clicked & chessboard.pieces[chessboard.turn]:
             active_square = index
             moves = get_valid_moves(active_square)
             highlight_moves(moves)
@@ -121,33 +121,12 @@ class ChessboardWidget(QGraphicsView):
         scene.setSceneRect(0, 0, 8 * self.cell_size, 8 * self.cell_size)
 
     def draw_pieces(self, scene):
-        w_pawns_indices = get_indices(self.chessboard.pawns_list[0])
-        w_knights_indices = get_indices(self.chessboard.knights_list[0])
-        w_bishops_indices = get_indices(self.chessboard.bishops_list[0])
-        w_rooks_indices = get_indices(self.chessboard.rooks_list[0])
-        w_queens_indices = get_indices(self.chessboard.queens_list[0])
-        w_king_indices = get_indices(self.chessboard.king_list[0])
+        for colour in [WHITE, BLACK]:
+            for piece, bitboard in enumerate(self.chessboard.bitboards[colour]):
+                indices = get_indices(bitboard)
+                icon = ICONS[piece][colour]
 
-        b_pawns_indices = get_indices(self.chessboard.pawns_list[1])
-        b_knights_indices = get_indices(self.chessboard.knights_list[1])
-        b_bishops_indices = get_indices(self.chessboard.bishops_list[1])
-        b_rooks_indices = get_indices(self.chessboard.rooks_list[1])
-        b_queens_indices = get_indices(self.chessboard.queens_list[1])
-        b_king_indices = get_indices(self.chessboard.king_list[1])
-
-        self.draw_piece(scene, w_pawns_indices, W_PAWN_ICON)
-        self.draw_piece(scene, w_knights_indices, W_KNIGHT_ICON)
-        self.draw_piece(scene, w_bishops_indices, W_BISHOP_ICON)
-        self.draw_piece(scene, w_rooks_indices, W_ROOK_ICON)
-        self.draw_piece(scene, w_queens_indices, W_QUEEN_ICON)
-        self.draw_piece(scene, w_king_indices, W_KING_ICON)
-
-        self.draw_piece(scene, b_pawns_indices, B_PAWN_ICON)
-        self.draw_piece(scene, b_knights_indices, B_KNIGHT_ICON)
-        self.draw_piece(scene, b_bishops_indices, B_BISHOP_ICON)
-        self.draw_piece(scene, b_rooks_indices, B_ROOK_ICON)
-        self.draw_piece(scene, b_queens_indices, B_QUEEN_ICON)
-        self.draw_piece(scene, b_king_indices, B_KING_ICON)
+                self.draw_piece(scene, indices, icon)
 
     def draw_piece(self, scene, indices, icon):
         for index in indices:

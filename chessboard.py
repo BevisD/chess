@@ -8,69 +8,112 @@ def single_push_targets(pawns: int, empty: int, colour: int):
 
 
 def pawn_west_attacks(pawns: int, attackable: int, colour: int):
-    pawns &= NOT_A_FILE
+    pawns &= NOT_A_FILE_BB
     west_attacks = ((pawns << 9) >> (colour << 4)) & attackable
     return west_attacks
 
 
 def pawn_east_attacks(pawns: int, attackable: int, colour: int):
-    pawns &= NOT_H_FILE
+    pawns &= NOT_H_FILE_BB
     east_attacks = ((pawns << 7) >> (colour << 4)) & attackable
     return east_attacks
 
 
 class ChessBoard:
     def __init__(self):
-        self.king_list = [W_KING, B_KING]
-        self.queens_list = [W_QUEEN, B_QUEEN]
-        self.bishops_list = [W_BISHOPS, B_BISHOPS]
-        self.knights_list = [W_KNIGHTS, B_KNIGHTS]
-        self.rooks_list = [W_ROOKS, B_ROOKS]
-        self.pawns_list = [W_PAWNS, B_PAWNS]
-        self.pieces_list = [W_PIECES, B_PIECES]
-        self.pieces = self.pieces_list[WHITE] | self.pieces_list[BLACK]
-        self.empty = ~self.pieces
+        self.bitboards = [[W_KING_BB, W_QUEEN_BB, W_ROOKS_BB, W_BISHOPS_BB, W_KNIGHTS_BB, W_PAWNS_BB],
+                          [B_KING_BB, B_QUEEN_BB, B_ROOKS_BB, B_BISHOPS_BB, B_KNIGHTS_BB, B_PAWNS_BB]]
         self.en_passant = 0
+        self.pieces = [self.get_piece_bitboard(WHITE),
+                       self.get_piece_bitboard(BLACK)]
+
+        self.all_pieces = self.pieces[WHITE] | self.pieces[WHITE]
+        self.empty = ~self.all_pieces
 
         self.turn = WHITE
         self.move_list = self.legal_moves(WHITE)
 
+    def get_piece_bitboard(self, colour):
+        pieces = 0
+        for bitboard in self.bitboards[colour]:
+            pieces |= bitboard
+        return pieces
+
     def make_move(self, move):
         code, to_square, from_square = move
-        if code == 0 or code == 1:
-            mask = (0b1 << to_square) | (0b1 << from_square)
-            # TODO Treat code0 and code1 moves separately for en passant
-            # TODO Move making must be easily un-doable for min-max
-            if self.king_list[self.turn] & mask:
-                self.king_list[self.turn] ^= mask
-            elif self.queens_list[self.turn] & mask:
-                self.queens_list[self.turn] ^= mask
-            elif self.rooks_list[self.turn] & mask:
-                self.rooks_list[self.turn] ^= mask
-            elif self.bishops_list[self.turn] & mask:
-                self.bishops_list[self.turn] ^= mask
-            elif self.knights_list[self.turn] & mask:
-                self.knights_list[self.turn] ^= mask
-            elif self.pawns_list[self.turn] & mask:
-                self.pawns_list[self.turn] ^= mask
+        # TODO Move making must be easily un-doable for min-max
+
+        # QUIET MOVE
+        if code == 0:
+            mask = (0b1 << to_square) + (0b1 << from_square)
+            for piece, bitboard in enumerate(self.bitboards[self.turn]):
+                if mask & bitboard:
+                    self.bitboards[self.turn][piece] ^= mask
+                    break
+
+        # DOUBLE-PUSH
+        elif code == 1:
+            mask = (0b1 << to_square) + (0b1 << from_square)
+            for piece, bitboard in enumerate(self.bitboards[self.turn]):
+                if mask & bitboard:
+                    self.bitboards[self.turn][piece] ^= mask
+                    break
+            if self.turn == WHITE:
+                self.en_passant = 0b1 << (from_square + 8)
+            else:
+                self.en_passant = 0b1 << (from_square - 8)
+
+        # KING-CASTLE
+        elif code == 2:
+            pass
+
+        # QUEEN-CASTLE
+        elif code == 3:
+            pass
+
+        # CAPTURE
+        elif code == 4:
+            move_mask = (0b1 << to_square) + (0b1 << from_square)
+            for piece, bitboard in enumerate(self.bitboards[self.turn]):
+                if move_mask & bitboard:
+                    self.bitboards[self.turn][piece] ^= move_mask
+                    break
+
+            capture_mask = 0b1 << to_square
+            for piece, bitboard in enumerate(self.bitboards[~self.turn]):
+                if capture_mask & bitboard:
+                    self.bitboards[~self.turn][piece] ^= capture_mask
+                    break
+
+        # EN-PASSANT CAPTURE
+        elif code == 5:
+            move_mask = (0b1 << to_square) + (0b1 << from_square)
+            for piece, bitboard in enumerate(self.bitboards[self.turn]):
+                if move_mask & bitboard:
+                    self.bitboards[self.turn][piece] ^= move_mask
+                    break
+
+            if self.turn == WHITE:
+                capture_mask = self.en_passant >> 8
+            else:
+                capture_mask = self.en_passant << 8
+
+            self.bitboards[~self.turn][PAWN] ^= capture_mask
+
+        if code != 1:
+            self.en_passant = 0
 
         self.turn = not self.turn
         self.update_pieces()
         self.move_list = self.legal_moves(self.turn)
-        print(self.move_list)
 
     def update_pieces(self):
-        # TODO This function needs to be undoable for min-max
-        for c in [WHITE, BLACK]:
-            self.pieces_list[c] = self.king_list[c] | \
-                                  self.queens_list[c] | \
-                                  self.rooks_list[c] | \
-                                  self.bishops_list[c] | \
-                                  self.knights_list[c] | \
-                                  self.pawns_list[c]
 
-        self.pieces = self.pieces_list[WHITE] | self.pieces_list[BLACK]
-        self.empty = ~self.pieces
+        self.pieces = [self.get_piece_bitboard(WHITE),
+                       self.get_piece_bitboard(BLACK)]
+
+        self.all_pieces = self.pieces[WHITE] | self.pieces[BLACK]
+        self.empty = ~self.all_pieces
 
     def legal_moves(self, colour: int):
         moves = []
@@ -107,7 +150,7 @@ class ChessBoard:
 
     def legal_single_push_moves(self, colour: int):
         moves = []
-        push_targets = single_push_targets(self.pawns_list[colour],
+        push_targets = single_push_targets(self.bitboards[colour][PAWN],
                                            self.empty, colour)
         indices = get_indices(push_targets)
 
@@ -126,15 +169,15 @@ class ChessBoard:
 
     def legal_double_push_moves(self, colour: int):
         moves = []
-        single_pawn_targets = single_push_targets(self.pawns_list[colour],
+        single_pawn_targets = single_push_targets(self.bitboards[colour][PAWN],
                                                   self.empty, colour)
         double_push_targets = single_push_targets(single_pawn_targets,
                                                   self.empty, colour)
 
         if colour:
-            double_push_targets &= RANK_5
+            double_push_targets &= RANK_5_BB
         else:
-            double_push_targets &= RANK_4
+            double_push_targets &= RANK_4_BB
 
         indices = get_indices(double_push_targets)
 
@@ -147,15 +190,15 @@ class ChessBoard:
             moves.append((1, to_square, from_square))
         return moves
 
-    def legal_pawn_attack_moves(self, colour):
+    def legal_pawn_attack_moves(self, colour: int):
         moves = []
-        west_attacks = pawn_west_attacks(self.pawns_list[colour],
-                                         self.pieces_list[~colour], colour)
-        east_attacks = pawn_east_attacks(self.pawns_list[colour],
-                                         self.pieces_list[~colour], colour)
-        west_en_passant = pawn_west_attacks(self.pawns_list[colour],
+        west_attacks = pawn_west_attacks(self.bitboards[colour][PAWN],
+                                         self.pieces[~colour], colour)
+        east_attacks = pawn_east_attacks(self.bitboards[colour][PAWN],
+                                         self.pieces[~colour], colour)
+        west_en_passant = pawn_west_attacks(self.bitboards[colour][PAWN],
                                             self.en_passant, colour)
-        east_en_passant = pawn_east_attacks(self.pawns_list[colour],
+        east_en_passant = pawn_east_attacks(self.bitboards[colour][PAWN],
                                             self.en_passant, colour)
 
         west_indices = get_indices(west_attacks)
